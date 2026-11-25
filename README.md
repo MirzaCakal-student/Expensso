@@ -40,8 +40,9 @@ app is online). Only that address can create the account or log in. Keys live on
 
 ## Data
 
-Everything is stored in `data/expenses.db` (SQLite). Back that file up to keep your
-history. Amounts are in KM.
+Without `TURSO_DATABASE_URL` everything is stored in `data/expenses.db` (SQLite). With
+`TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` set, the app uses that Turso database instead,
+which is what the hosted version uses. Amounts are in KM.
 
 ## Tests
 

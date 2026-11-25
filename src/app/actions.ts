@@ -6,7 +6,7 @@ import {
   clearFails, createSession, destroySession, hashPassword, isLocked,
   recordFail, requireUser, userCount, verifyPassword,
 } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { get, run } from "@/lib/db";
 import { isExpenseCategory, isIncomeSource, isPaymentMethod } from "@/lib/categories";
 import { parseAmount } from "@/lib/money";
 import { isValidDate } from "@/lib/summary";
@@ -21,32 +21,37 @@ export async function authenticate(_prev: FormState, form: FormData): Promise<Fo
   // OWNER_EMAIL locks the app to one address, so nobody else can claim it
   // by registering first once it is online.
   const owner = process.env.OWNER_EMAIL?.trim().toLowerCase();
+  if (!owner && process.env.VERCEL) {
+    return { error: "OWNER_EMAIL is not set on the server. Add it in the Vercel project settings." };
+  }
   if (owner && email !== owner) {
-    recordFail(email);
+    await recordFail(email);
     return { error: "Wrong email or password." };
   }
 
-  if (userCount() === 0) {
+  if ((await userCount()) === 0) {
     // First run: the first account created becomes the only account.
     if (password.length < 8) return { error: "Use a password with at least 8 characters." };
-    const res = db()
-      .prepare("INSERT INTO users (email, password_hash) VALUES (?, ?)")
-      .run(email, hashPassword(password));
-    await createSession(Number(res.lastInsertRowid));
+    const res = await run("INSERT INTO users (email, password_hash) VALUES (?, ?)", [
+      email,
+      hashPassword(password),
+    ]);
+    await createSession(res.lastId);
     redirect("/");
   }
 
-  if (isLocked(email)) {
+  if (await isLocked(email)) {
     return { error: "Too many wrong attempts. Try again in 15 minutes." };
   }
-  const user = db().prepare("SELECT id, password_hash FROM users WHERE email = ?").get(email) as
-    | { id: number; password_hash: string }
-    | undefined;
+  const user = await get<{ id: number; password_hash: string }>(
+    "SELECT id, password_hash FROM users WHERE email = ?",
+    [email],
+  );
   if (!user || !verifyPassword(password, user.password_hash)) {
-    recordFail(email);
+    await recordFail(email);
     return { error: "Wrong email or password." };
   }
-  clearFails(email);
+  await clearFails(email);
   await createSession(user.id);
   redirect("/");
 }
@@ -82,19 +87,17 @@ export async function saveTransaction(form: FormData): Promise<FormState> {
 
   const id = Number(form.get("id"));
   if (id) {
-    db()
-      .prepare(
-        `UPDATE transactions SET kind=?, amount=?, date=?, category=?, method=?, note=?
-         WHERE id=? AND user_id=?`,
-      )
-      .run(kind, amount, date, category as string, method, note, id, user.id);
+    await run(
+      `UPDATE transactions SET kind=?, amount=?, date=?, category=?, method=?, note=?
+       WHERE id=? AND user_id=?`,
+      [kind, amount, date, category as string, method, note, id, user.id],
+    );
   } else {
-    db()
-      .prepare(
-        `INSERT INTO transactions (user_id, kind, amount, date, category, method, note)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(user.id, kind, amount, date, category as string, method, note);
+    await run(
+      `INSERT INTO transactions (user_id, kind, amount, date, category, method, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [user.id, kind, amount, date, category as string, method, note],
+    );
   }
   revalidatePath("/");
   return {};
@@ -102,6 +105,6 @@ export async function saveTransaction(form: FormData): Promise<FormState> {
 
 export async function deleteTransaction(id: number): Promise<void> {
   const user = await requireUser();
-  db().prepare("DELETE FROM transactions WHERE id=? AND user_id=?").run(id, user.id);
+  await run("DELETE FROM transactions WHERE id=? AND user_id=?", [id, user.id]);
   revalidatePath("/");
 }

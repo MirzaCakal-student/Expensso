@@ -2,7 +2,7 @@ import "server-only";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { db } from "./db";
+import { get, run } from "./db";
 
 const COOKIE = "session";
 const SESSION_DAYS = 30;
@@ -25,17 +25,19 @@ export function verifyPassword(password: string, stored: string): boolean {
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
-export function userCount(): number {
-  return (db().prepare("SELECT COUNT(*) AS n FROM users").get() as { n: number }).n;
+export async function userCount(): Promise<number> {
+  return (await get<{ n: number }>("SELECT COUNT(*) AS n FROM users"))?.n ?? 0;
 }
 
 export async function createSession(userId: number): Promise<void> {
   const token = randomBytes(32).toString("hex");
   const expires = Date.now() + SESSION_DAYS * 86_400_000;
-  db().prepare("DELETE FROM sessions WHERE expires_at < ?").run(Date.now());
-  db()
-    .prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)")
-    .run(sha(token), userId, expires);
+  await run("DELETE FROM sessions WHERE expires_at < ?", [Date.now()]);
+  await run("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)", [
+    sha(token),
+    userId,
+    expires,
+  ]);
   const h = await headers();
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,
@@ -50,19 +52,18 @@ export async function createSession(userId: number): Promise<void> {
 export async function destroySession(): Promise<void> {
   const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
-  if (token) db().prepare("DELETE FROM sessions WHERE token_hash = ?").run(sha(token));
+  if (token) await run("DELETE FROM sessions WHERE token_hash = ?", [sha(token)]);
   jar.delete(COOKIE);
 }
 
 export async function getUser(): Promise<User | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
-  const row = db()
-    .prepare(
-      `SELECT u.id, u.email FROM sessions s JOIN users u ON u.id = s.user_id
-       WHERE s.token_hash = ? AND s.expires_at > ?`,
-    )
-    .get(sha(token), Date.now()) as User | undefined;
+  const row = await get<User>(
+    `SELECT u.id, u.email FROM sessions s JOIN users u ON u.id = s.user_id
+     WHERE s.token_hash = ? AND s.expires_at > ?`,
+    [sha(token), Date.now()],
+  );
   return row ? { id: row.id, email: row.email } : null;
 }
 
@@ -73,25 +74,29 @@ export async function requireUser(): Promise<User> {
 }
 
 // Basic brute-force protection: 5 wrong passwords locks that email for 15 minutes.
+// Kept in the database so it holds across serverless instances.
 const MAX_FAILS = 5;
 const WINDOW_MS = 15 * 60_000;
-const g = globalThis as unknown as { __loginFails?: Map<string, { n: number; until: number }> };
-const fails = (g.__loginFails ??= new Map());
 
-export function isLocked(email: string): boolean {
-  const f = fails.get(email);
-  if (!f) return false;
-  if (Date.now() > f.until) {
-    fails.delete(email);
-    return false;
-  }
-  return f.n >= MAX_FAILS;
+export async function isLocked(email: string): Promise<boolean> {
+  const f = await get<{ count: number; until: number }>(
+    "SELECT count, until FROM login_failures WHERE email = ?",
+    [email],
+  );
+  return Boolean(f && f.until > Date.now() && f.count >= MAX_FAILS);
 }
-export function recordFail(email: string): void {
-  const f = fails.get(email);
-  const n = f && Date.now() <= f.until ? f.n + 1 : 1;
-  fails.set(email, { n, until: Date.now() + WINDOW_MS });
+
+export async function recordFail(email: string): Promise<void> {
+  const now = Date.now();
+  await run(
+    `INSERT INTO login_failures (email, count, until) VALUES (?, 1, ?)
+     ON CONFLICT(email) DO UPDATE SET
+       count = CASE WHEN until > ? THEN count + 1 ELSE 1 END,
+       until = excluded.until`,
+    [email, now + WINDOW_MS, now],
+  );
 }
-export function clearFails(email: string): void {
-  fails.delete(email);
+
+export async function clearFails(email: string): Promise<void> {
+  await run("DELETE FROM login_failures WHERE email = ?", [email]);
 }

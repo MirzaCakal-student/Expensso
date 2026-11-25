@@ -6,9 +6,11 @@ import { formatMoney } from "@/lib/money";
 import { categoryTotals, currentMonth, today, trend } from "@/lib/queries";
 import { monthLabel } from "@/lib/summary";
 
-function spendingContext(userId: number): string {
-  const lines = trend(userId, currentMonth(), 3).map((m) => {
-    const cats = categoryTotals(userId, m.month)
+async function spendingContext(userId: number): Promise<string> {
+  const months = await trend(userId, currentMonth(), 3);
+  const totals = await Promise.all(months.map((m) => categoryTotals(userId, m.month)));
+  const lines = months.map((m, i) => {
+    const cats = totals[i]
       .map((c) => `${categoryLabel(c.category)} ${formatMoney(c.total)}`)
       .join("; ");
     return `${monthLabel(m.month)}: income ${formatMoney(m.income)}, spent ${formatMoney(m.spent)}${
@@ -42,7 +44,7 @@ export async function POST(req: Request) {
 Help them decide what is worth buying, compare products and prices from photos they send, and understand their own spending. Be direct and practical: give a clear recommendation and the reason, and say so when you cannot tell from a photo. Reply in plain text without Markdown, in the language the user writes in.
 
 Their recent spending:
-${spendingContext(user.id)}`,
+${await spendingContext(user.id)}`,
     },
   ];
   for (const [i, m] of incoming.entries()) {

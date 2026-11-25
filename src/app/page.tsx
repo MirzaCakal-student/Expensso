@@ -20,7 +20,7 @@ export default async function Home({
   const user = await requireUser();
   const sp = await searchParams;
   const month = isValidMonth(sp.month) ? sp.month : currentMonth();
-  const txs = monthTransactions(user.id, month);
+  const txs = await monthTransactions(user.id, month);
   const s = summarize(txs, month);
   const label = monthLabel(month);
   const monthName = label.split(" ")[0];
@@ -29,7 +29,7 @@ export default async function Home({
     label: categoryLabel(c.id),
     color: categoryColor(c.id),
   }));
-  const months = trend(user.id, month).map((m) => ({
+  const months = (await trend(user.id, month)).map((m) => ({
     ...m,
     label: monthLabel(m.month).slice(0, 3),
   }));

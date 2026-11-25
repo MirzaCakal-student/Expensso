@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
   if (await getUser()) redirect("/");
-  const firstRun = userCount() === 0;
+  const firstRun = (await userCount()) === 0;
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-5 py-10">
       <h1 className="font-display text-4xl font-bold tracking-tight">Spendbook</h1>
