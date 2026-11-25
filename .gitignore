@@ -43,3 +43,6 @@ next-env.d.ts
 # local data and secrets
 /data
 !.env.example
+
+.vercel
+.env*
