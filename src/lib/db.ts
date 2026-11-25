@@ -35,6 +35,20 @@ const SCHEMA = `
     count INTEGER NOT NULL,
     until INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS passkeys (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    public_key TEXT NOT NULL,
+    counter INTEGER NOT NULL DEFAULT 0,
+    transports TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS webauthn_challenges (
+    id TEXT PRIMARY KEY,
+    challenge TEXT NOT NULL,
+    user_id INTEGER,
+    expires_at INTEGER NOT NULL
+  );
 `;
 
 const g = globalThis as unknown as { __expenseDb?: Promise<Client> };

@@ -8,6 +8,8 @@ import { isValidMonth, monthLabel, shiftMonth, summarize } from "@/lib/summary";
 import { Charts } from "@/components/Charts";
 import { Ledger } from "@/components/Ledger";
 import { SalaryBar } from "@/components/SalaryBar";
+import { PasskeySetup } from "@/components/Passkey";
+import { passkeyCount } from "@/lib/passkeys";
 import { logout } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +22,10 @@ export default async function Home({
   const user = await requireUser();
   const sp = await searchParams;
   const month = isValidMonth(sp.month) ? sp.month : currentMonth();
-  const txs = await monthTransactions(user.id, month);
+  const [txs, passkeys] = await Promise.all([
+    monthTransactions(user.id, month),
+    passkeyCount(user.id),
+  ]);
   const s = summarize(txs, month);
   const label = monthLabel(month);
   const monthName = label.split(" ")[0];
@@ -99,6 +104,8 @@ export default async function Home({
           </div>
         </dl>
       </section>
+
+      <PasskeySetup hasPasskey={passkeys > 0} />
 
       <Ledger txs={txs} today={today()} monthName={monthName} aiEnabled={aiConfigured()}>
         <Charts
