@@ -9,7 +9,7 @@ export default async function LoginPage() {
   const firstRun = (await userCount()) === 0;
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-5 py-10">
-      <h1 className="font-display text-4xl font-bold tracking-tight">Spendbook</h1>
+      <h1 className="font-display text-4xl font-bold tracking-tight">Expensso</h1>
       <p className="mt-2 text-muted">
         {firstRun
           ? "Create your account. It will be the only account on this app."

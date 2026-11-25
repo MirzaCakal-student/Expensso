@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Spendbook",
-    short_name: "Spendbook",
+    name: "Expensso",
+    short_name: "Expensso",
     description: "Track what comes in and where it goes.",
     start_url: "/",
     display: "standalone",

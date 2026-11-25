@@ -1,4 +1,4 @@
-# Spendbook
+# Expensso
 
 Personal income and expense tracker: enter your salary and side income, log what you
 spend (by hand or by photographing a receipt), and see where the money goes.

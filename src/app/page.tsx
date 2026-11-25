@@ -37,7 +37,7 @@ export default async function Home({
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
       <header className="flex items-center justify-between gap-3 py-4">
-        <span className="font-display text-xl font-bold tracking-tight">Spendbook</span>
+        <span className="font-display text-xl font-bold tracking-tight">Expensso</span>
         <nav className="flex items-center gap-1 text-sm font-medium">
           <Link href="/chat" className="rounded-lg px-3 py-2 hover:bg-card">
             Ask AI

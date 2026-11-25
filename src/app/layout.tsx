@@ -6,7 +6,7 @@ const display = Bricolage_Grotesque({ variable: "--font-display-face", subsets: 
 const body = Instrument_Sans({ variable: "--font-body", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Spendbook",
+  title: "Expensso",
   description: "Track what comes in and where it goes.",
 };
 
