@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSession } from "@/lib/auth";
+import { track } from "@/lib/track";
 import { authenticationOptions, finishAuthentication, passkeyCount } from "@/lib/passkeys";
 
 // GET: a fingerprint login challenge. POST: check the signed answer and log in.
@@ -26,5 +27,6 @@ export async function POST(req: Request) {
     );
   }
   await createSession(userId);
+  await track(userId, "login");
   return NextResponse.json({ ok: true });
 }

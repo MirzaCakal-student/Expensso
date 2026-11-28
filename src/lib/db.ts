@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient, type Client, type InValue } from "@libsql/client";
+import { createClient, type Client, type InStatement, type InValue } from "@libsql/client";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
@@ -49,7 +49,36 @@ const SCHEMA = `
     user_id INTEGER,
     expires_at INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS allowed_emails (
+    email TEXT PRIMARY KEY,
+    added_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER,
+    type TEXT NOT NULL,
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_events_at ON events(at);
+  CREATE TABLE IF NOT EXISTS ai_usage (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER,
+    kind TEXT NOT NULL,
+    model TEXT NOT NULL,
+    prompt_tokens INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    ok INTEGER NOT NULL,
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_ai_usage_at ON ai_usage(at);
 `;
+
+// Columns added after the first release. Each runs once; "duplicate column"
+// errors on databases that already have it are expected and ignored.
+const MIGRATIONS = [
+  "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'",
+  "ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'",
+];
 
 const g = globalThis as unknown as { __expenseDb?: Promise<Client> };
 
@@ -62,6 +91,13 @@ async function open(): Promise<Client> {
   }
   const client = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
   await client.executeMultiple(SCHEMA);
+  for (const sql of MIGRATIONS) {
+    try {
+      await client.execute(sql);
+    } catch (err) {
+      if (!String(err).includes("duplicate column")) throw err;
+    }
+  }
   return client;
 }
 
@@ -95,4 +131,9 @@ export async function get<T = Row>(sql: string, args: InValue[] = []): Promise<T
 export async function run(sql: string, args: InValue[] = []): Promise<{ lastId: number }> {
   const res = await (await client()).execute({ sql, args });
   return { lastId: Number(res.lastInsertRowid ?? 0) };
+}
+
+/** Runs several statements in one transaction: all of them or none. */
+export async function batch(statements: InStatement[]): Promise<void> {
+  await (await client()).batch(statements, "write");
 }

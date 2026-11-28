@@ -117,12 +117,9 @@ export async function finishRegistration(
 
 export async function authenticationOptions() {
   const { rpID } = await relyingParty();
-  const keys = await all<StoredPasskey>("SELECT id, transports FROM passkeys");
-  const options = await generateAuthenticationOptions({
-    rpID,
-    allowCredentials: keys.map((p) => ({ id: p.id, transports: splitTransports(p.transports) })),
-    userVerification: "required",
-  });
+  // No allowCredentials: the phone offers its own passkey for this site, so
+  // the login page never reveals which accounts exist.
+  const options = await generateAuthenticationOptions({ rpID, userVerification: "required" });
   await saveChallenge(options.challenge, null);
   return options;
 }
@@ -134,7 +131,8 @@ export async function finishAuthentication(
   const pending = await takeChallenge();
   if (!pending || typeof response?.id !== "string") return null;
   const key = await get<StoredPasskey>(
-    "SELECT id, user_id, public_key, counter, transports FROM passkeys WHERE id = ?",
+    `SELECT p.id, p.user_id, p.public_key, p.counter, p.transports FROM passkeys p
+     JOIN users u ON u.id = p.user_id WHERE p.id = ? AND u.status = 'approved'`,
     [response.id],
   );
   if (!key) return null;

@@ -7,7 +7,13 @@ import { get, run } from "./db";
 const COOKIE = "session";
 const SESSION_DAYS = 30;
 
-export type User = { id: number; email: string };
+export type User = { id: number; email: string; role: "admin" | "user" };
+
+/** The admin's email. OWNER_EMAIL is the older name for the same setting. */
+export function adminEmail(): string | null {
+  const v = (process.env.ADMIN_EMAIL ?? process.env.OWNER_EMAIL)?.trim().toLowerCase();
+  return v || null;
+}
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16);
@@ -60,16 +66,22 @@ export async function getUser(): Promise<User | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   const row = await get<User>(
-    `SELECT u.id, u.email FROM sessions s JOIN users u ON u.id = s.user_id
-     WHERE s.token_hash = ? AND s.expires_at > ?`,
+    `SELECT u.id, u.email, u.role FROM sessions s JOIN users u ON u.id = s.user_id
+     WHERE s.token_hash = ? AND s.expires_at > ? AND u.status = 'approved'`,
     [sha(token), Date.now()],
   );
-  return row ? { id: row.id, email: row.email } : null;
+  return row ? { id: row.id, email: row.email, role: row.role === "admin" ? "admin" : "user" } : null;
 }
 
 export async function requireUser(): Promise<User> {
   const user = await getUser();
   if (!user) redirect("/login");
+  return user;
+}
+
+export async function requireAdmin(): Promise<User> {
+  const user = await requireUser();
+  if (user.role !== "admin") redirect("/");
   return user;
 }
 

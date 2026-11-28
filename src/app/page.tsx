@@ -10,6 +10,8 @@ import { Ledger } from "@/components/Ledger";
 import { SalaryBar } from "@/components/SalaryBar";
 import { PasskeySetup } from "@/components/Passkey";
 import { passkeyCount } from "@/lib/passkeys";
+import { AdSlot } from "@/components/AdSlot";
+import { track } from "@/lib/track";
 import { logout } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +27,7 @@ export default async function Home({
   const [txs, passkeys] = await Promise.all([
     monthTransactions(user.id, month),
     passkeyCount(user.id),
+    track(user.id, "view"),
   ]);
   const s = summarize(txs, month);
   const label = monthLabel(month);
@@ -44,6 +47,11 @@ export default async function Home({
       <header className="flex items-center justify-between gap-3 py-4">
         <span className="font-display text-xl font-bold tracking-tight">Expensso</span>
         <nav className="flex items-center gap-1 text-sm font-medium">
+          {user.role === "admin" && (
+            <Link href="/admin" className="rounded-lg px-3 py-2 hover:bg-card">
+              Admin
+            </Link>
+          )}
           <Link href="/chat" className="rounded-lg px-3 py-2 hover:bg-card">
             Ask AI
           </Link>
@@ -117,6 +125,8 @@ export default async function Home({
           months={months}
         />
       </Ledger>
+
+      {user.role !== "admin" && <AdSlot />}
     </div>
   );
 }

@@ -32,11 +32,20 @@ retires models). Without a key the rest of the app works and the AI buttons are 
 
 Photos you scan or send in chat go to that AI provider.
 
-## Security
+## Accounts and admin
 
-Set `OWNER_EMAIL` in `.env.local` (and in the hosting provider's settings once the
-app is online). Only that address can create the account or log in. Keys live only in
-`.env.local`, which git ignores; never put them in code.
+Anyone can create an account, but new accounts wait until the admin approves them.
+The admin is the account whose email matches `ADMIN_EMAIL`; creating it also needs
+`ADMIN_SETUP_CODE`, because emails are not verified. The admin panel at `/admin`
+approves, adds and deletes people and shows usage, AI token use and an ad revenue estimate.
+
+Keys live only in `.env.local` and in the hosting provider's settings, never in code.
+
+## Ads
+
+Set `NEXT_PUBLIC_ADSENSE_CLIENT` and `NEXT_PUBLIC_ADSENSE_SLOT` from a Google AdSense
+account to show one ad on the overview. The admin never sees ads. `/ads.txt` is served
+automatically.
 
 ## Data
 

@@ -1,4 +1,5 @@
 import "server-only";
+import { trackAI } from "./track";
 
 // Works with any OpenAI-compatible chat API (Gemini, Groq, OpenRouter, OpenAI).
 // Configure in .env.local: AI_API_KEY, and optionally AI_BASE_URL and AI_MODEL.
@@ -29,7 +30,13 @@ function failureFor(status: number, model: string): AIError {
   return new AIError(`The AI service returned an error (${status}). Try again.`);
 }
 
-export async function chatCompletion(messages: AIMessage[], maxTokens = 1200): Promise<string> {
+export type AIUse = { userId: number | null; kind: "scan" | "chat" };
+
+export async function chatCompletion(
+  messages: AIMessage[],
+  maxTokens: number,
+  use: AIUse,
+): Promise<string> {
   if (!aiConfigured()) {
     throw new AIError("AI is not set up yet. Add AI_API_KEY to .env.local and restart the app.");
   }
@@ -44,7 +51,9 @@ export async function chatCompletion(messages: AIMessage[], maxTokens = 1200): P
     .filter(Boolean);
 
   let failure = new AIError("The AI service did not answer. Try again.");
+  let lastModel = models[0] ?? "unknown";
   for (const model of models) {
+    lastModel = model;
     let res: Response;
     try {
       res = await fetch(`${base}/chat/completions`, {
@@ -71,11 +80,22 @@ export async function chatCompletion(messages: AIMessage[], maxTokens = 1200): P
       failure = failureFor(res.status, model);
       continue;
     }
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    };
     const text = data.choices?.[0]?.message?.content;
+    await trackAI({
+      ...use,
+      model,
+      promptTokens: data.usage?.prompt_tokens ?? 0,
+      completionTokens: data.usage?.completion_tokens ?? 0,
+      ok: Boolean(text),
+    });
     if (text) return text;
     failure = new AIError("The AI service returned an empty reply. Try again.");
   }
+  await trackAI({ ...use, model: lastModel, promptTokens: 0, completionTokens: 0, ok: false });
   throw failure;
 }
 

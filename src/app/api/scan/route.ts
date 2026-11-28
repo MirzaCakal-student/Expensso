@@ -16,7 +16,8 @@ Reply with ONLY a JSON object, no other text:
 - payment_method: "card" if the receipt shows a card payment (KARTICA, VISA, MASTERCARD), "cash" if it shows GOTOVINA, otherwise null.`;
 
 export async function POST(req: Request) {
-  if (!(await getUser())) return NextResponse.json({ error: "Log in again." }, { status: 401 });
+  const user = await getUser();
+  if (!user) return NextResponse.json({ error: "Log in again." }, { status: 401 });
   if (Number(req.headers.get("content-length") ?? 0) > 8_000_000) {
     return NextResponse.json({ error: "That photo is too large." }, { status: 413 });
   }
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
         },
       ],
       400,
+      { userId: user.id, kind: "scan" },
     );
     const draft = parseReceiptReply(reply);
     if (!draft) {

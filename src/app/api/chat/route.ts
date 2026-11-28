@@ -59,7 +59,7 @@ ${await spendingContext(user.id)}`,
   }
 
   try {
-    return NextResponse.json({ reply: await chatCompletion(messages) });
+    return NextResponse.json({ reply: await chatCompletion(messages, 1200, { userId: user.id, kind: "chat" }) });
   } catch (err) {
     const message = err instanceof AIError ? err.message : "The AI could not answer. Try again.";
     if (!(err instanceof AIError)) console.error(err);
